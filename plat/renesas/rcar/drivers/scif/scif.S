@@ -102,6 +102,7 @@
 
 	.globl	console_init
 	.globl	console_putc
+	.globl	console_uninit
 	.globl	console_core_init
 	.globl	console_core_putc
 	.globl	console_getc
@@ -323,4 +324,13 @@ func console_flush
 	mov	w0, #0
 	ret
 endfunc console_flush
+
+	/* -----------------------------------------------
+	 * void console_uninit(void)
+	 * Function to finish the use of console driver.
+	 * -----------------------------------------------
+	 */
+func console_uninit
+	ret
+endfunc console_uninit
 
