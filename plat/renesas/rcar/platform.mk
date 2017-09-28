@@ -62,7 +62,8 @@ BL31_SOURCES		+=	${RCAR_GIC_SOURCES}				\
 				lib/cpus/aarch64/cortex_a57.S			\
 				plat/renesas/rcar/bl31_rcar_setup.c		\
 				plat/renesas/rcar/rcar_pm.c			\
-				plat/renesas/rcar/drivers/memdrv/rcar_console.S	\
+				plat/renesas/rcar/drivers/scif/scif.S		\
+				plat/renesas/rcar/drivers/wait/micro_wait.S	\
 				plat/renesas/rcar/drivers/memdrv/rcar_printf.c	\
 				plat/renesas/rcar/rcar_topology.c		\
 				plat/renesas/rcar/aarch64/rcar_helpers.S	\
