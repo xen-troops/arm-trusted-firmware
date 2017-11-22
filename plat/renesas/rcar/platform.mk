@@ -70,7 +70,7 @@ BL31_SOURCES		+=	${RCAR_GIC_SOURCES}				\
 				plat/renesas/rcar/rcar_sip_svc.c		\
 				plat/renesas/rcar/drivers/board/board.c		\
 				plat/renesas/rcar/drivers/dramconf/dramconf.c	\
-				plat/renesas/rcar/drivers/memdrv/rcar_console.S	\
+				plat/renesas/rcar/drivers/scif/scif.S		\
 				plat/renesas/rcar/drivers/memdrv/rcar_printf.c	\
 				plat/renesas/rcar/rcar_topology.c		\
 				plat/renesas/rcar/aarch64/rcar_helpers.S	\

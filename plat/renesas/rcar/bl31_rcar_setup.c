@@ -95,7 +95,7 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 	/* arg3 is not used in RCAR_BL31. */
 
 	/* Initialize the log area to provide early debug support */
-	console_init(1U, 0U, 0U);
+	console_init(0U, 0U, 0U);
 
 	NOTICE("BL3-1 : Rev.%s\n",version_of_renesas);
 
