@@ -11,6 +11,7 @@
 #include <debug.h>
 #include <arch.h>
 #include <arch_helpers.h>
+#include <platform.h>
 #include <xlat_tables_v2.h>
 #include "rcar_def.h"
 #include "rcar_private.h"
@@ -158,6 +159,9 @@ static void rcar_bl31_set_self_refresh(void);
 static void rcar_bl31_set_self_refresh_e3(void);
 #endif /* RCAR_SYSTEM_SUSPEND */
 static void SCU_power_up(uint64_t mpidr);
+
+uint64_t rcar_saved_cntpct_el0;
+uint32_t rcar_saved_cntfid;
 
 uint32_t rcar_pwrc_status(uint64_t mpidr)
 {
@@ -749,7 +753,7 @@ void rcar_bl31_set_suspend_to_ram(void)
 {
 	uint32_t sctlr;
 
-	rcar_bl31_save_generic_timer(rcar_stack_generic_timer);
+	rcar_save_timer_state();
 
 	/* disable MMU */
 	sctlr = (uint32_t)read_sctlr_el3();
@@ -911,4 +915,32 @@ uint32_t rcar_bl31_get_cpu_num(uint32_t cluster_type)
 		}
 	}
 	return num;
+}
+
+void rcar_save_timer_state(void)
+{
+	rcar_saved_cntpct_el0 = read_cntpct_el0();
+
+	rcar_saved_cntfid =
+	       mmio_read_32((uintptr_t)(RCAR_CNTC_BASE + (uint32_t)CNTFID_OFF));
+}
+
+void rcar_restore_timer_state(void)
+{
+	/* Stop timer before restoring counter value */
+	mmio_write_32((uintptr_t)(RCAR_CNTC_BASE + (uint32_t)CNTCR_OFF), 0);
+
+	mmio_write_32((uintptr_t)(RCAR_CNTC_BASE + (uint32_t)CNTCVL_OFF),
+		rcar_saved_cntpct_el0 & 0xFFFFFFFF);
+	mmio_write_32((uintptr_t)(RCAR_CNTC_BASE + (uint32_t)CNTCVH_OFF),
+		rcar_saved_cntpct_el0 >> 32);
+
+	mmio_write_32((uintptr_t)(RCAR_CNTC_BASE + (uint32_t)CNTFID_OFF),
+		rcar_saved_cntfid);
+
+	/* Start generic timer back */
+	write_cntfrq_el0((unsigned long)plat_get_syscnt_freq2());
+
+	mmio_write_32((uintptr_t)(RCAR_CNTC_BASE + (uint32_t)CNTCR_OFF),
+		(CNTCR_FCREQ(U(0))|CNTCR_EN));
 }
