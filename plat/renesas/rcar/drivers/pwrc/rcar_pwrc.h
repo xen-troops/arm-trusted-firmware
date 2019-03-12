@@ -69,6 +69,9 @@ void rcar_bl31_go_suspend_to_ram(void);
 void rcar_bl31_set_suspend_to_ram(void);
 void rcar_bl31_init_suspend_to_ram(void);
 void rcar_bl31_suspend_to_ram(void);
+
+void rcar_save_timer_state(void);
+void rcar_restore_timer_state(void);
 #endif /* RCAR_SYSTEM_SUSPEND */
 void rcar_bl31_code_copy_to_system_ram(uint32_t type);
 uint32_t rcar_bl31_get_cluster(void);
@@ -78,13 +81,9 @@ uint32_t rcar_bl31_get_cpu_num(uint32_t cluster_type);
 extern uint32_t rcar_bl31_asm_switch_stack_pointer(uintptr_t jump, uintptr_t stack,
                 void *arg);
 
-extern void rcar_bl31_save_generic_timer(uint64_t *rcar_stack_generic_timer);
-
 extern uint8_t __system_ram_start__[1];
 extern uint8_t __system_ram_end__[1];
 extern uint8_t __SRAM_COPY_START__[1];
-
-extern uint64_t rcar_stack_generic_timer[5];
 
 #endif /*__ASSEMBLY__*/
 

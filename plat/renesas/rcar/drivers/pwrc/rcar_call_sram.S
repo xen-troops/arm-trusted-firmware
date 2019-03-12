@@ -52,37 +52,3 @@ func rcar_bl31_asm_switch_stack_pointer
 	ldp	x29, x30, [sp,#-16]
 	ret
 endfunc rcar_bl31_asm_switch_stack_pointer
-
-/* X0 : Stack pointer base addrtess */
-func rcar_bl31_save_generic_timer
-
-	stp	x9, x10, [x0, #OFFSET_SP_X9_X10]
-
-	/* save CNTFID0 and cntpct_el0 */
-	mov_imm	x10, (RCAR_CNTC_BASE + CNTFID_OFF)
-	ldr	x9, [x10]
-	mrs	x10, cntpct_el0
-	stp	x9, x10, [x0, #OFFSET_CNTFID0]
-
-	ldp	x9, x10, [x0, #OFFSET_SP_X9_X10]
-
-	ret
-endfunc rcar_bl31_save_generic_timer
-
-/* X0 : Stack pointer base addrtess */
-func rcar_bl31_restore_generic_timer
-
-	stp	x9, x10, [x0, #OFFSET_SP_X9_X10]
-
-	/* restore CNTFID0 and cntpct_el0 */
-	ldr	x10, [x0, #OFFSET_CNTFID0]
-	mov_imm	x9, (RCAR_CNTC_BASE + CNTFID_OFF)
-	str	x10, [x9]
-	ldp	x9, x10, [x0, #OFFSET_CNTPCT_EL0]
-	add	x9, x9, x10
-	str	x9, [x0, #OFFSET_TIMER_COUNT]
-
-	ldp	x9, x10, [x0, #OFFSET_SP_X9_X10]
-
-	ret
-endfunc rcar_bl31_restore_generic_timer
