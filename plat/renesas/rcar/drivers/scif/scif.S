@@ -316,11 +316,6 @@ func console_flush
 	cmp	w1, #SCFSR_TEND_TRANS_END
 	bne	1b
 
-	ldr	x0, =SCIF2_BASE
-	ldrh	w1, [x0, #SCIF_SCSCR]
-	and	w1, w1, #~(SCSCR_TE_EN + SCSCR_RE_EN)	/* TE=0,RE=0 */
-	strh	w1, [x0, #SCIF_SCSCR]
-
 	mov	w0, #0
 	ret
 endfunc console_flush
