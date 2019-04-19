@@ -18,6 +18,8 @@
 /* Function ID to get the Dramconf */
 #define RCAR_SIP_SVC_GET_DRAMCONF	U(0x82000000)
 
+#define RCAR_SIP_SVC_MBOX_TRIGGER	U(0x82000001)
+
 /* Rcar SiP Service Calls version numbers */
 #define RCAR_SIP_SVC_VERSION_MAJOR	U(0x0)
 #define RCAR_SIP_SVC_VERSION_MINOR	U(0x1)

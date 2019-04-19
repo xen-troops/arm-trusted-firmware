@@ -56,6 +56,11 @@ static uintptr_t rcar_sip_handler(unsigned int smc_fid,
 #endif
 		SMC_RET1(handle, ret);
 
+	case RCAR_SIP_SVC_MBOX_TRIGGER:
+		ret = rcar_trigger_scpi(x1, x2, x3, x4);
+
+		SMC_RET1(handle, ret);
+
 	case RCAR_SIP_SVC_CALL_COUNT:
 		/* Return the number of function IDs */
 #if RCAR_SMC_GET_DRAMCONF
