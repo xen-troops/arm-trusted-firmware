@@ -151,44 +151,51 @@ static uint32_t scpi_handle_cmd(int cmd, uint8_t *payload_size,
 		*payload_size = 4;
 		return SCPI_OK;
 	case SCP_CMD_DVFS_CAPABILITY:
-		/* number of implemented voltage domains: only one */
-		mmio_write_32(payload_out, 1);
+		/* number of implemented voltage domains: only two */
+		mmio_write_32(payload_out, 2);
 		*payload_size = 0x1;
 		return SCPI_OK;
 	case SCP_CMD_DVFS_GET_INFO: {
-		int i, nr_opp;
+		int i, nr_opp, domain = par1 & 0xff;
 
-		/* we support only one voltage domains for now */
-		if ((par1 & 0xff) != 0)
+		/* we support only two voltage domains for now */
+		if (domain > 1)
 			return SCPI_E_PARAM;
 
-		nr_opp = rcar_dvfs_get_nr_opp();
-		mmio_write_32(payload_out, (rcar_dvfs_get_latency() << 16) | (nr_opp << 8) | 0);
+		nr_opp = rcar_dvfs_get_nr_opp(domain);
+		mmio_write_32(payload_out, (rcar_dvfs_get_latency(domain) << 16) |
+				(nr_opp << 8) | domain);
 		for (i = 0; i < nr_opp; i++) {
 			mmio_write_32(payload_out + 4 + 2 * i * 4,
-					rcar_dvfs_get_opp_frequency(i));
+					rcar_dvfs_get_opp_frequency(domain, i));
 			mmio_write_32(payload_out + 4 + 2 * i * 4 + 4,
-					rcar_dvfs_get_opp_voltage(i));
+					rcar_dvfs_get_opp_voltage(domain, i));
 		}
 		*payload_size = 4 + 2 * nr_opp * 4;
 		return SCPI_OK;
 	}
-	case SCP_CMD_DVFS_SET_INDEX:
-		/* we support only one voltage domains for now */
-		if ((par1 & 0xff) != 0)
+	case SCP_CMD_DVFS_SET_INDEX: {
+		int domain = par1 & 0xff;
+
+		/* we support only two voltage domains for now */
+		if (domain > 1)
 			return SCPI_E_PARAM;
 
-		if (rcar_dvfs_set_index((par1 >> 8) & 0xff))
+		if (rcar_dvfs_set_index(domain, (par1 >> 8) & 0xff))
 			return SCPI_E_RANGE;
 		return SCPI_OK;
-	case SCP_CMD_DVFS_GET_INDEX:
-		/* we support only one voltage domains for now */
-		if ((par1 & 0xff) != 0)
+	}
+	case SCP_CMD_DVFS_GET_INDEX: {
+		int domain = par1 & 0xff;
+
+		/* we support only two voltage domains for now */
+		if (domain > 1)
 			return SCPI_E_PARAM;
 
-		mmio_write_32(payload_out, rcar_dvfs_get_index());
+		mmio_write_32(payload_out, rcar_dvfs_get_index(domain));
 		*payload_size = 0x1;
 		return SCPI_OK;
+	}
 	}
 
 	return SCPI_E_SUPPORT;

@@ -47,13 +47,19 @@ struct op_points
 	unsigned long volt;	/* uV */
 };
 
-#define NR_H3_OPP	5
-#define NR_M3_OPP	6
+#define A57_DOMAIN	0
+#define A53_DOMAIN	1
+
+#define NR_H3_A57_OPP	5
+#define NR_M3_A57_OPP	6
+
+#define NR_H3_A53_OPP	3
+#define NR_M3_A53_OPP	4
 
 #define ARRAY_SIZE(a)	(sizeof(a) / sizeof((a)[0]))
 
 /* Describe OPPs exactly how they are described in the device-tree */
-static const struct op_points rcar_h3_op_points[EFUSE_AVS_NUM][NR_H3_OPP] = {
+static const struct op_points rcar_h3_a57_op_points[EFUSE_AVS_NUM][NR_H3_A57_OPP] = {
 	{
 		{ 500000000,  830000, },
 		{ 1000000000, 830000, },
@@ -112,7 +118,13 @@ static const struct op_points rcar_h3_op_points[EFUSE_AVS_NUM][NR_H3_OPP] = {
 	},
 };
 
-static const struct op_points rcar_m3_op_points[EFUSE_AVS_NUM][NR_M3_OPP] = {
+static const struct op_points rcar_h3_a53_op_points[NR_H3_A53_OPP] = {
+	{ 800000000,  820000, },
+	{ 1000000000, 820000, },
+	{ 1200000000, 820000, },
+};
+
+static const struct op_points rcar_m3_a57_op_points[EFUSE_AVS_NUM][NR_M3_A57_OPP] = {
 	{
 		{ 500000000,  830000, },
 		{ 1000000000, 830000, },
@@ -180,6 +192,13 @@ static const struct op_points rcar_m3_op_points[EFUSE_AVS_NUM][NR_M3_OPP] = {
 	},
 };
 
+static const struct op_points rcar_m3_a53_op_points[NR_M3_A53_OPP] = {
+	{ 800000000,  820000, },
+	{ 1000000000, 820000, },
+	{ 1200000000, 820000, },
+	{ 1300000000, 820000, },
+};
+
 #define DIV_ROUND(n, d) (((n) + (d) / 2) / (d))
 #define min(x, y)		(((x) < (y)) ? (x) : (y))
 #define max(x, y)		(((x) > (y)) ? (x) : (y))
@@ -214,29 +233,54 @@ static const struct op_points rcar_m3_op_points[EFUSE_AVS_NUM][NR_M3_OPP] = {
 
 #define Z_CLK_MAX_THRESHOLD             1500000000U
 
-static int current_opp_index;
-static int current_opp_latency;
-static int current_opp_limit = 0;
-static const struct op_points *current_opp_table;
+static int current_a57_opp_index;
+static int current_a57_opp_latency;
+static int current_a57_opp_limit = 0;
+static const struct op_points *current_a57_opp_table;
+
+static int current_a53_opp_index;
+static int current_a53_opp_latency;
+static int current_a53_opp_limit = 0;
+static const struct op_points *current_a53_opp_table;
 
 static int dvfs_inited = 0;
 
-uint32_t rcar_dvfs_get_opp_voltage(int oppnr)
+uint32_t rcar_dvfs_get_opp_voltage(int domain, int oppnr)
 {
-	if (oppnr < 0 || oppnr >= current_opp_limit)
-		return ~0;
+	if (domain == A57_DOMAIN) {
+		if (oppnr < 0 || oppnr >= current_a57_opp_limit)
+			return ~0;
 
-	/* Protocol requires voltage to be in mV */
-	return current_opp_table[oppnr].volt / 1000;
+		/* Protocol requires voltage to be in mV */
+		return current_a57_opp_table[oppnr].volt / 1000;
+	} else if (domain == A53_DOMAIN) {
+		if (oppnr < 0 || oppnr >= current_a53_opp_limit)
+			return ~0;
+
+		/* Protocol requires voltage to be in mV */
+		return current_a53_opp_table[oppnr].volt / 1000;
+	}
+
+	return ~0;
 }
 
-uint32_t rcar_dvfs_get_opp_frequency(int oppnr)
+uint32_t rcar_dvfs_get_opp_frequency(int domain, int oppnr)
 {
-	if (oppnr < 0 || oppnr >= current_opp_limit)
-		return ~0;
+	if (domain == A57_DOMAIN) {
+		if (oppnr < 0 || oppnr >= current_a57_opp_limit)
+			return ~0;
 
-	/* Protocol requires frequency to be in Hz */
-	return current_opp_table[oppnr].freq;
+		/* Protocol requires frequency to be in Hz */
+		return current_a57_opp_table[oppnr].freq;
+	} else if (domain == A53_DOMAIN) {
+		if (oppnr < 0 || oppnr >= current_a53_opp_limit)
+			return ~0;
+
+		/* Protocol requires frequency to be in Hz */
+		return current_a53_opp_table[oppnr].freq;
+	}
+
+	return ~0;
 }
 
 static unsigned long pll0_clk_parent_rate(void)
@@ -465,19 +509,26 @@ static int set_voltage(unsigned long volt)
 	return volt;
 }*/
 
-static const struct op_points *find_opp(unsigned long freq)
+static const struct op_points *find_opp(int domain, unsigned long freq)
 {
 	int i;
 
-	for (i = 0; i < current_opp_limit; i++) {
-		if (current_opp_table[i].freq == freq)
-			return &current_opp_table[i];
+	if (domain == A57_DOMAIN) {
+		for (i = 0; i < current_a57_opp_limit; i++) {
+			if (current_a57_opp_table[i].freq == freq)
+				return &current_a57_opp_table[i];
+		}
+	} else if (domain == A53_DOMAIN) {
+		for (i = 0; i < current_a53_opp_limit; i++) {
+			if (current_a53_opp_table[i].freq == freq)
+				return &current_a53_opp_table[i];
+		}
 	}
 
 	return NULL;
 }
 
-static int set_opp(unsigned long target_freq)
+static int set_a57_opp(unsigned long target_freq)
 {
 	unsigned long freq, old_freq, prate, old_prate;
 	const struct op_points *opp, *old_opp;
@@ -496,13 +547,13 @@ static int set_opp(unsigned long target_freq)
 		return 0;
 	}
 
-	old_opp = find_opp(old_freq);
+	old_opp = find_opp(A57_DOMAIN, old_freq);
 	if (!old_opp) {
 		NOTICE("%s(): failed to find current OPP for freq %lu\n",
 				__func__, old_freq);
 	}
 
-	opp = find_opp(freq);
+	opp = find_opp(A57_DOMAIN, freq);
 	if (!opp) {
 		NOTICE("%s(): failed to find new OPP for freq %lu\n",
 				__func__, freq);
@@ -519,7 +570,7 @@ static int set_opp(unsigned long target_freq)
 		}
 	}
 
-	/*NOTICE("Switching CPU OPP: %lu Hz --> %lu Hz\n", old_freq, freq);*/
+	/*NOTICE("%s(): Switching CPU OPP: %lu Hz --> %lu Hz\n", __func__, old_freq, freq);*/
 
 	prate = pll0_clk_round_rate(prate);
 	if (old_prate != prate)
@@ -563,35 +614,70 @@ restore_voltage:
 	return ret;
 }
 
-int rcar_dvfs_set_index(int index)
+static int set_a53_opp(unsigned long target_freq)
+{
+	return 0;
+}
+
+int rcar_dvfs_set_index(int domain, int index)
 {
 	int ret;
 
-	if (index < 0 || index >= current_opp_limit)
-		return -1;
+	if (domain == A57_DOMAIN) {
+		if (index < 0 || index >= current_a57_opp_limit)
+			return -1;
 
-	ret = set_opp(rcar_dvfs_get_opp_frequency(index));
-	if (ret)
-		return ret;
+		ret = set_a57_opp(rcar_dvfs_get_opp_frequency(domain, index));
+		if (ret)
+			return ret;
 
-	current_opp_index = index;
+		current_a57_opp_index = index;
+
+		return 0;
+	} else if (domain == A53_DOMAIN) {
+		if (index < 0 || index >= current_a53_opp_limit)
+			return -1;
+
+		ret = set_a53_opp(rcar_dvfs_get_opp_frequency(domain, index));
+		if (ret)
+			return ret;
+
+		current_a53_opp_index = index;
+
+		return 0;
+	}
+
+	return -1;
+}
+
+int rcar_dvfs_get_index(int domain)
+{
+	if (domain == A57_DOMAIN)
+		return current_a57_opp_index;
+	else if (domain == A53_DOMAIN)
+		return current_a53_opp_index;
 
 	return 0;
 }
 
-int rcar_dvfs_get_index(void)
+int rcar_dvfs_get_nr_opp(int domain)
 {
-	return current_opp_index;
+	if (domain == A57_DOMAIN)
+		return current_a57_opp_limit;
+	else if (domain == A53_DOMAIN)
+		return current_a53_opp_limit;
+
+	return 0;
 }
 
-int rcar_dvfs_get_nr_opp(void)
+int rcar_dvfs_get_latency(int domain)
 {
-	return current_opp_limit;
-}
+	if (domain == A57_DOMAIN)
+		return current_a57_opp_latency;
+	else if (domain == A53_DOMAIN)
+		return current_a53_opp_latency;
 
-int rcar_dvfs_get_latency(void)
-{
-	return current_opp_latency;
+	return 0;
 }
 
 int rcar_dvfs_opp_init(void)
@@ -604,18 +690,29 @@ int rcar_dvfs_opp_init(void)
 	product = mmio_read_32(RCAR_PRR) & RCAR_PRODUCT_MASK;
 
 	if (product == RCAR_PRODUCT_H3) {
-		current_opp_limit = ARRAY_SIZE(rcar_h3_op_points[efuse_avs]);
-		current_opp_table = &rcar_h3_op_points[efuse_avs][0];
+		current_a57_opp_limit = ARRAY_SIZE(rcar_h3_a57_op_points[efuse_avs]);
+		current_a57_opp_table = &rcar_h3_a57_op_points[efuse_avs][0];
+
+		current_a53_opp_limit = ARRAY_SIZE(rcar_h3_a53_op_points);
+		current_a53_opp_table = &rcar_h3_a53_op_points[0];
 	} else if (product == RCAR_PRODUCT_M3) {
-		current_opp_limit = ARRAY_SIZE(rcar_m3_op_points[efuse_avs]);
-		current_opp_table = &rcar_m3_op_points[efuse_avs][0];
+		current_a57_opp_limit = ARRAY_SIZE(rcar_m3_a57_op_points[efuse_avs]);
+		current_a57_opp_table = &rcar_m3_a57_op_points[efuse_avs][0];
+
+		current_a53_opp_limit = ARRAY_SIZE(rcar_m3_a53_op_points);
+		current_a53_opp_table = &rcar_m3_a53_op_points[0];
 	} else
 		return -1;
 
 	/* Guess it is 1500000000 Hz for now */
-	current_opp_index = 2;
+	current_a57_opp_index = 2;
 	/* Latency is 300 uS for all OPPs */
-	current_opp_latency = 300;
+	current_a57_opp_latency = 300;
+
+	/* Guess it is 1200000000 Hz for now */
+	current_a53_opp_index = 2;
+	/* Latency is 300 uS for all OPPs */
+	current_a53_opp_latency = 300;
 
 	dvfs_inited = 1;
 

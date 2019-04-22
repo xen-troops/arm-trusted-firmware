@@ -144,12 +144,12 @@ int rcar_clock_set_rate(int clocknr, uint32_t freq);
 
 /* Declarations for rcar_dvfs.c */
 int rcar_dvfs_opp_init(void);
-uint32_t rcar_dvfs_get_opp_voltage(int oppnr);
-uint32_t rcar_dvfs_get_opp_frequency(int oppnr);
-int rcar_dvfs_set_index(int index);
-int rcar_dvfs_get_index(void);
-int rcar_dvfs_get_nr_opp(void);
-int rcar_dvfs_get_latency(void);
+uint32_t rcar_dvfs_get_opp_voltage(int domain, int oppnr);
+uint32_t rcar_dvfs_get_opp_frequency(int domain, int oppnr);
+int rcar_dvfs_set_index(int domain, int index);
+int rcar_dvfs_get_index(int domain);
+int rcar_dvfs_get_nr_opp(int domain);
+int rcar_dvfs_get_latency(int domain);
 
 /* Prototype function for power management	*/
 void rcar_affinst_standby(unsigned int power_state);
