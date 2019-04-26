@@ -206,15 +206,17 @@ static const struct op_points rcar_m3_a53_op_points[NR_M3_A53_OPP] = {
 /* CPG base address */
 #define	CPG_BASE		(0xE6150000U)
 
+#define CPG_PLLECR		0x00D0
 #define CPG_PLL0CR		0x00d8
+#define CPG_PLL2CR		0x002c
 
 /* Implementation for customized clocks (Z-clk, Z2-clk, PLL0-clk) for CPUFreq */
-#define CPG_PLLECR     0x00D0
-#define CPG_PLLECR_PLL0ST (1 << 8)
+#define CPG_PLLECR_PLL0ST	BIT(8)
+#define CPG_PLLECR_PLL2ST	BIT(10)
 
 /* Define for PLL0 clk driver */
-#define CPG_PLL0CR_STC_MASK             0x7f000000
-#define CPG_PLL0CR_STC_SHIFT            24
+#define CPG_PLLCR_STC_MASK             0x7f000000
+#define CPG_PLLCR_STC_SHIFT            24
 
 /* Modify for Z-clock and Z2-clock
  *
@@ -232,6 +234,7 @@ static const struct op_points rcar_m3_a53_op_points[NR_M3_A53_OPP] = {
 #define CPG_FRQCRC_Z2FC_MASK		0x1f
 
 #define Z_CLK_MAX_THRESHOLD             1500000000U
+#define Z2_CLK_MAX_THRESHOLD            1200000000U
 
 static int current_a57_opp_index;
 static int current_a57_opp_latency;
@@ -283,7 +286,7 @@ uint32_t rcar_dvfs_get_opp_frequency(int domain, int oppnr)
 	return ~0;
 }
 
-static unsigned long pll0_clk_parent_rate(void)
+static unsigned long pll_clk_parent_rate(void)
 {
 	static const unsigned long extal_freq[] = {
 			16660000U,	/* MD14_MD13_TYPE_0 */
@@ -307,7 +310,7 @@ static unsigned long pll0_clk_parent_rate(void)
 
 static unsigned long pll0_clk_round_rate(unsigned long rate)
 {
-	unsigned long parent_rate = pll0_clk_parent_rate();
+	unsigned long parent_rate = pll_clk_parent_rate();
 	unsigned int mult;
 
 	if (rate < Z_CLK_MAX_THRESHOLD)
@@ -315,7 +318,7 @@ static unsigned long pll0_clk_round_rate(unsigned long rate)
 
 	mult = DIV_ROUND(rate, parent_rate);
 	mult = max(mult, 90U); /* Lowest value is 1.5GHz (stc == 90) */
-	mult = min(mult, 120U);
+	mult = min(mult, 108U);
 
 	rate = parent_rate * mult;
 	/* Round to closest value at 100MHz unit */
@@ -326,12 +329,12 @@ static unsigned long pll0_clk_round_rate(unsigned long rate)
 
 static unsigned long pll0_clk_recalc_rate(void)
 {
-	unsigned long parent_rate = pll0_clk_parent_rate();
+	unsigned long parent_rate = pll_clk_parent_rate();
 	unsigned int val;
 	unsigned long rate;
 
-	val = (mmio_read_32(CPG_BASE + CPG_PLL0CR) & CPG_PLL0CR_STC_MASK)
-			>> CPG_PLL0CR_STC_SHIFT;
+	val = (mmio_read_32(CPG_BASE + CPG_PLL0CR) & CPG_PLLCR_STC_MASK)
+			>> CPG_PLLCR_STC_SHIFT;
 
 	rate = parent_rate * (val + 1);
 	/* Round to closest value at 100MHz unit */
@@ -342,19 +345,19 @@ static unsigned long pll0_clk_recalc_rate(void)
 
 static int pll0_clk_set_rate(unsigned long rate)
 {
-	unsigned long parent_rate = pll0_clk_parent_rate();
+	unsigned long parent_rate = pll_clk_parent_rate();
 	unsigned int stc_val;
 	uint32_t val;
 	int i;
 
 	stc_val = DIV_ROUND(rate, parent_rate);
 	stc_val = max(stc_val, 90U); /* Lowest value is 1.5GHz (stc == 90) */
-	stc_val = min(stc_val, 120U);
+	stc_val = min(stc_val, 108U);
 
 	stc_val -= 1;
 	val = mmio_read_32(CPG_BASE + CPG_PLL0CR);
-	val &= ~CPG_PLL0CR_STC_MASK;
-	val |= stc_val << CPG_PLL0CR_STC_SHIFT;
+	val &= ~CPG_PLLCR_STC_MASK;
+	val |= stc_val << CPG_PLLCR_STC_SHIFT;
 	mmio_write_32(CPG_BASE + CPG_PLL0CR, val);
 
 	i = 0;
@@ -365,6 +368,70 @@ static int pll0_clk_set_rate(unsigned long rate)
 
 	if (i > 1000)
 		NOTICE("%s(): PLL0: long settled time: %d\n", __func__, i);
+
+	return 0;
+}
+
+static unsigned long pll2_clk_round_rate(unsigned long rate)
+{
+	unsigned long parent_rate = pll_clk_parent_rate();
+	unsigned int mult;
+
+	if (rate < Z2_CLK_MAX_THRESHOLD)
+		rate = Z2_CLK_MAX_THRESHOLD; /* Set lowest value: 1.2GHz */
+
+	mult = DIV_ROUND(rate, parent_rate);
+	mult = max(mult, 72U); /* Lowest value is 1.2GHz (stc == 72) */
+	mult = min(mult, 78U);
+
+	rate = parent_rate * mult;
+	/* Round to closest value at 100MHz unit */
+	rate = 100000000 * DIV_ROUND(rate, 100000000);
+
+	return rate;
+}
+
+static unsigned long pll2_clk_recalc_rate(void)
+{
+	unsigned long parent_rate = pll_clk_parent_rate();
+	unsigned int val;
+	unsigned long rate;
+
+	val = (mmio_read_32(CPG_BASE + CPG_PLL2CR) & CPG_PLLCR_STC_MASK)
+			>> CPG_PLLCR_STC_SHIFT;
+
+	rate = parent_rate * (val + 1);
+	/* Round to closest value at 100MHz unit */
+	rate = 100000000 * DIV_ROUND(rate, 100000000);
+
+	return rate;
+}
+
+static int pll2_clk_set_rate(unsigned long rate)
+{
+	unsigned long parent_rate = pll_clk_parent_rate();
+	unsigned int stc_val;
+	uint32_t val;
+	int i;
+
+	stc_val = DIV_ROUND(rate, parent_rate);
+	stc_val = max(stc_val, 72U); /* Lowest value is 1.2GHz (stc == 72) */
+	stc_val = min(stc_val, 78U);
+
+	stc_val -= 1;
+	val = mmio_read_32(CPG_BASE + CPG_PLL2CR);
+	val &= ~CPG_PLLCR_STC_MASK;
+	val |= stc_val << CPG_PLLCR_STC_SHIFT;
+	mmio_write_32(CPG_BASE + CPG_PLL2CR, val);
+
+	i = 0;
+	while (!(mmio_read_32(CPG_BASE + CPG_PLLECR) & CPG_PLLECR_PLL2ST)) {
+		/*cpu_relax();*/
+		i++;
+	}
+
+	if (i > 1000)
+		NOTICE("%s(): PLL2: long settled time: %d\n", __func__, i);
 
 	return 0;
 }
@@ -460,7 +527,100 @@ static int z_clk_set_rate(unsigned long rate, unsigned long parent_rate)
 		/*cpu_relax();*/
 	}
 
-	return 0;
+	return -1;
+}
+
+static unsigned long z2_clk_round_rate(unsigned long rate, unsigned long *parent_rate)
+{
+	unsigned long prate = *parent_rate;
+	unsigned int mult;
+
+	if (!prate)
+		prate = 1;
+
+	if (rate <= Z2_CLK_MAX_THRESHOLD) { /* Focus on changing z2-clock */
+		prate = Z2_CLK_MAX_THRESHOLD; /* Set parent to: 1.2GHz */
+		mult = DIV_ROUND(rate * 32, prate);
+	} else {
+		/* Focus on changing parent. Fix z2-clock divider is 32/32 */
+		mult = 32;
+	}
+	mult = max(mult, 1U);
+	mult = min(mult, 32U);
+
+	/* Re-calculate the parent_rate to propagate new rate for it */
+	prate = DIV_ROUND(rate * 32, mult);
+	prate = 100000000 * DIV_ROUND(prate, 100000000);
+	rate = 100000000 * DIV_ROUND(prate / 32 * mult, 100000000);
+	*parent_rate = prate;
+
+	return rate;
+}
+
+static unsigned long z2_clk_recalc_rate(unsigned long parent_rate)
+{
+	unsigned int mult;
+	unsigned int val;
+	unsigned long rate;
+
+	val = mmio_read_32(CPG_BASE + CPG_FRQCRC) & CPG_FRQCRC_Z2FC_MASK;
+	mult = 32 - val;
+
+	rate = DIV_ROUND(parent_rate * mult, 32);
+	/* Round to closest value at 100MHz unit */
+	rate = 100000000 * DIV_ROUND(rate, 100000000);
+
+	return rate;
+}
+
+static int z2_clk_set_rate(unsigned long rate, unsigned long parent_rate)
+{
+	unsigned int mult;
+	uint32_t val, kick;
+	unsigned int i;
+
+	if (rate <= Z2_CLK_MAX_THRESHOLD) { /* Focus on changing z2-clock */
+		parent_rate = Z2_CLK_MAX_THRESHOLD; /* Set parent to: 1.2GHz */
+		mult = DIV_ROUND(rate * 32, parent_rate);
+	} else {
+		mult = 32;
+	}
+	mult = max(mult, 1U);
+	mult = min(mult, 32U);
+
+	if (mmio_read_32(CPG_BASE + CPG_FRQCRB) & CPG_FRQCRB_KICK)
+		return -1;
+
+	val = mmio_read_32(CPG_BASE + CPG_FRQCRC);
+	val &= ~CPG_FRQCRC_Z2FC_MASK;
+	val |= 32 - mult;
+	mmio_write_32(CPG_BASE + CPG_FRQCRC, val);
+
+	/*
+	 * Set KICK bit in FRQCRB to update hardware setting and wait for
+	 * clock change completion.
+	 */
+	kick = mmio_read_32(CPG_BASE + CPG_FRQCRB);
+	kick |= CPG_FRQCRB_KICK;
+	mmio_write_32(CPG_BASE + CPG_FRQCRB, kick);
+
+	/*
+	 * Note: There is no HW information about the worst case latency.
+	 *
+	 * Using experimental measurements, it seems that no more than
+	 * ~10 iterations are needed, independently of the CPU rate.
+	 * Since this value might be dependent of external xtal rate, pll1
+	 * rate or even the other emulation clocks rate, use 1000 as a
+	 * "super" safe value.
+	 */
+	for (i = 1000; i; i--) {
+		if (!(mmio_read_32(CPG_BASE + CPG_FRQCRB) & CPG_FRQCRB_KICK))
+			return 0;
+
+		/*cpu_relax();*/
+	}
+
+	return -1;
 }
 
 /* Default limits measured in millivolts and milliamps */
@@ -616,7 +776,48 @@ restore_voltage:
 
 static int set_a53_opp(unsigned long target_freq)
 {
-	return 0;
+	unsigned long freq, old_freq, prate, old_prate;
+	const struct op_points *opp, *old_opp;
+	int ret;
+
+	prate = 0;
+	freq = z2_clk_round_rate(target_freq, &prate);
+
+	old_prate = pll2_clk_recalc_rate();
+	old_freq = z2_clk_recalc_rate(old_prate);
+
+	/* Return early if nothing to do */
+	if (old_freq == freq) {
+		NOTICE("%s(): old/new frequencies (%lu Hz) are same, nothing to do\n",
+			__func__, freq);
+		return 0;
+	}
+
+	old_opp = find_opp(A53_DOMAIN, old_freq);
+	if (!old_opp) {
+		NOTICE("%s(): failed to find current OPP for freq %lu\n",
+				__func__, old_freq);
+	}
+
+	opp = find_opp(A53_DOMAIN, freq);
+	if (!opp) {
+		NOTICE("%s(): failed to find new OPP for freq %lu\n",
+				__func__, freq);
+		return -1;
+	}
+
+	/*NOTICE("%s(): Switching CPU OPP: %lu Hz --> %lu Hz\n", __func__, old_freq, freq);*/
+
+	prate = pll2_clk_round_rate(prate);
+	if (old_prate != prate)
+		pll2_clk_set_rate(prate);
+
+	ret = z2_clk_set_rate(freq, prate);
+	if (ret) {
+		NOTICE("%s(): failed to set clock rate: %d\n", __func__, ret);
+	}
+
+	return ret;
 }
 
 int rcar_dvfs_set_index(int domain, int index)
