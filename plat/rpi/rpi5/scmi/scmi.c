@@ -10,8 +10,11 @@
 #include <drivers/scmi.h>
 
 #include <platform_def.h>
+#include "device.h"
 
 #define RPI_SHM_N_BASE(n)	(RPI_SCMI_SHMEM_BASE + n * PAGE_SIZE)
+
+static uint32_t rpi_scmi_device_owner[RPI5_SCMI_DEV_COUNT];
 
 static struct scmi_msg_channel scmi_channel[] = {
 	[0] = {
@@ -81,6 +84,16 @@ size_t plat_scmi_protocol_count(void)
 uint32_t plat_scmi_agent_count(void)
 {
 	return SCMI_NUM_AGENTS;
+}
+
+uint32_t plat_scmi_device_count(void)
+{
+	return RPI5_SCMI_DEV_COUNT;
+}
+
+uint32_t *plat_scmi_device_owners(void)
+{
+	return rpi_scmi_device_owner;
 }
 
 const uint8_t *plat_scmi_protocol_list(unsigned int agent_id __unused)
