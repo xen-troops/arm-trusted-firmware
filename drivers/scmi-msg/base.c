@@ -197,6 +197,109 @@ static void discover_agent(struct scmi_msg *msg)
 	scmi_write_response(msg, &return_values, sizeof(return_values));
 }
 
+static void set_device_permissions(struct scmi_msg *msg)
+{
+	const struct scmi_base_set_device_permissions_a2p *a2p = NULL;
+	uint32_t *device_owners = plat_scmi_device_owners();
+	uint32_t device_id;
+	uint32_t agent_id;
+	uint32_t flags;
+
+	struct scmi_base_set_device_permissions_p2a return_values = {
+		.status = SCMI_SUCCESS,
+	};
+
+	if (msg->in_size != sizeof(*a2p)) {
+		scmi_status_response(msg, SCMI_PROTOCOL_ERROR);
+		return;
+	}
+
+	if (msg->agent_id != 0) {
+		scmi_status_response(msg, SCMI_DENIED);
+		return;
+	}
+
+	if (!device_owners) {
+		scmi_status_response(msg, SCMI_NOT_SUPPORTED);
+		return;
+	}
+
+	a2p = (void *)msg->in;
+	agent_id = SPECULATION_SAFE_VALUE(a2p->agent_id);
+	device_id = SPECULATION_SAFE_VALUE(a2p->device_id);
+	flags = SPECULATION_SAFE_VALUE(a2p->flags);
+
+	if (agent_id >= plat_scmi_agent_count())
+	{
+		scmi_status_response(msg, SCMI_INVALID_PARAMETERS);
+		return;
+	}
+
+	if (device_id >= plat_scmi_device_count())
+	{
+		scmi_status_response(msg, SCMI_INVALID_PARAMETERS);
+		return;
+	}
+
+	/* TODO: Probably we need to lock device_owners */
+	if (flags & SCMI_BASE_ACCESS_TYPE)
+		device_owners[device_id] = agent_id;
+	else
+		device_owners[device_id] = 0;
+
+	scmi_write_response(msg, &return_values, sizeof(return_values));
+}
+
+static void reset_agent_configuration(struct scmi_msg *msg)
+{
+	const struct scmi_base_reset_agent_configuration_a2p *a2p = NULL;
+	uint32_t *device_owners = plat_scmi_device_owners();
+	uint32_t device_id;
+	uint32_t agent_id;
+	uint32_t flags;
+
+	struct scmi_base_reset_agent_configuration_p2a return_values = {
+		.status = SCMI_SUCCESS,
+	};
+
+	if (msg->in_size != sizeof(*a2p)) {
+		scmi_status_response(msg, SCMI_PROTOCOL_ERROR);
+		return;
+	}
+
+	if (msg->agent_id != 0) {
+		scmi_status_response(msg, SCMI_DENIED);
+		return;
+	}
+
+	if (!device_owners) {
+		scmi_status_response(msg, SCMI_NOT_SUPPORTED);
+		return;
+	}
+
+	a2p = (void *)msg->in;
+	agent_id = SPECULATION_SAFE_VALUE(a2p->agent_id);
+	flags = SPECULATION_SAFE_VALUE(a2p->flags);
+
+	if (agent_id >= plat_scmi_agent_count())
+	{
+		scmi_status_response(msg, SCMI_INVALID_PARAMETERS);
+		return;
+	}
+
+	/* TODO: Probably we need to lock device_owners */
+	for (device_id = 0; device_id < plat_scmi_agent_count(); device_id++)
+		if (device_owners[device_id] == agent_id)
+		{
+			plat_scmi_reset_device_state(device_id);
+			if (flags & SCMI_BASE_PERMISSIONS_RESET)
+				device_owners[device_id] = 0;
+		}
+
+	scmi_write_response(msg, &return_values, sizeof(return_values));
+}
+
+
 static const scmi_msg_handler_t scmi_base_handler_table[] = {
 	[SCMI_PROTOCOL_VERSION] = report_version,
 	[SCMI_PROTOCOL_ATTRIBUTES] = report_attributes,
@@ -207,6 +310,8 @@ static const scmi_msg_handler_t scmi_base_handler_table[] = {
 					discover_implementation_version,
 	[SCMI_BASE_DISCOVER_LIST_PROTOCOLS] = discover_list_protocols,
 	[SCMI_BASE_DISCOVER_AGENT] = discover_agent,
+	[SCMI_BASE_SET_DEVICE_PERMISSIONS] = set_device_permissions,
+	[SCMI_BASE_RESET_AGENT_CONFIGURATION] = reset_agent_configuration,
 };
 
 static bool message_id_is_supported(unsigned int message_id)
@@ -231,4 +336,21 @@ scmi_msg_handler_t scmi_msg_get_base_handler(struct scmi_msg *msg)
 uint32_t plat_scmi_agent_count(void)
 {
 	return 1;
+}
+
+#pragma weak plat_scmi_device_count
+uint32_t plat_scmi_device_count(void)
+{
+	return 0;
+}
+
+#pragma weak plat_scmi_device_owners
+uint32_t *plat_scmi_device_owners(void)
+{
+	return NULL;
+}
+
+#pragma weak plat_scmi_reset_device_state
+void plat_scmi_reset_device_state(uint32_t device_id)
+{
 }

@@ -80,6 +80,21 @@ size_t plat_scmi_protocol_count(void);
 uint32_t plat_scmi_agent_count(void);
 
 /*
+ * Return how many SCMI devices are supported by the platform.
+ */
+uint32_t plat_scmi_device_count(void);
+
+/* Get platform's list of device owners. This function should return
+ * an array which length is equal to return value of plat_scmi_device_count()
+ */
+uint32_t *plat_scmi_device_owners(void);
+
+/*
+ * Reset device state to initial value.
+ */
+void plat_scmi_reset_device_state(uint32_t device_id);
+
+/*
  * Get the count and list of SCMI protocols (but base) supported for an agent
  *
  * @agent_id: SCMI agent ID
