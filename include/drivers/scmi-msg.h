@@ -75,6 +75,11 @@ struct scmi_msg_channel *plat_scmi_get_channel(unsigned int agent_id);
 size_t plat_scmi_protocol_count(void);
 
 /*
+ * Return how many SCMI agents are supported by the platform.
+ */
+uint32_t plat_scmi_agent_count(void);
+
+/*
  * Get the count and list of SCMI protocols (but base) supported for an agent
  *
  * @agent_id: SCMI agent ID

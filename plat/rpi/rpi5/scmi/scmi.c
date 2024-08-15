@@ -11,12 +11,39 @@
 
 #include <platform_def.h>
 
-#define RPI_SHM_BASE		RPI_SCMI_SHMEM_BASE
-#define RPI_SHM0_BASE	RPI_SHM_BASE
+#define RPI_SHM_N_BASE(n)	(RPI_SCMI_SHMEM_BASE + n * PAGE_SIZE)
 
 static struct scmi_msg_channel scmi_channel[] = {
 	[0] = {
-		.shm_addr = RPI_SHM0_BASE,
+		.shm_addr = RPI_SHM_N_BASE(0),
+		.shm_size = SMT_BUF_SLOT_SIZE,
+	},
+	[1] = {
+		.shm_addr = RPI_SHM_N_BASE(1),
+		.shm_size = SMT_BUF_SLOT_SIZE,
+	},
+	[2] = {
+		.shm_addr = RPI_SHM_N_BASE(2),
+		.shm_size = SMT_BUF_SLOT_SIZE,
+	},
+	[3] = {
+		.shm_addr = RPI_SHM_N_BASE(3),
+		.shm_size = SMT_BUF_SLOT_SIZE,
+	},
+	[4] = {
+		.shm_addr = RPI_SHM_N_BASE(4),
+		.shm_size = SMT_BUF_SLOT_SIZE,
+	},
+	[5] = {
+		.shm_addr = RPI_SHM_N_BASE(5),
+		.shm_size = SMT_BUF_SLOT_SIZE,
+	},
+	[6] = {
+		.shm_addr = RPI_SHM_N_BASE(6),
+		.shm_size = SMT_BUF_SLOT_SIZE,
+	},
+	[7] = {
+		.shm_addr = RPI_SHM_N_BASE(7),
 		.shm_size = SMT_BUF_SLOT_SIZE,
 	},
 };
@@ -49,6 +76,11 @@ static const uint8_t plat_protocol_list[] = {
 size_t plat_scmi_protocol_count(void)
 {
 	return ARRAY_SIZE(plat_protocol_list) - 1U;
+}
+
+uint32_t plat_scmi_agent_count(void)
+{
+	return SCMI_NUM_AGENTS;
 }
 
 const uint8_t *plat_scmi_protocol_list(unsigned int agent_id __unused)
