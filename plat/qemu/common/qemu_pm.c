@@ -6,6 +6,7 @@
  */
 
 #include <assert.h>
+#include <stdbool.h>
 #include <platform_def.h>
 
 #include <arch_helpers.h>
@@ -24,6 +25,9 @@
  * The secure entry point to be used on warm reset.
  */
 static uintptr_t secure_entrypoint;
+
+/* Distinguish SYSTEM_SUSPEND from all-level CPU power-down states. */
+static bool system_suspend_requested;
 
 /* Make composite power state parameter till power level 0 */
 #if PSCI_EXTENDED_STATE_ID
@@ -76,6 +80,9 @@ static int qemu_validate_power_state(unsigned int power_state,
 
 	assert(req_state);
 
+	/* Clear a possibly aborted SYSTEM_SUSPEND before handling CPU_SUSPEND. */
+	system_suspend_requested = false;
+
 	/*
 	 *  Currently we are using a linear search for finding the matching
 	 *  entry in the idle power state array. This can be made a binary
@@ -101,6 +108,15 @@ static int qemu_validate_power_state(unsigned int power_state,
 	}
 
 	return PSCI_E_SUCCESS;
+}
+
+static void qemu_get_sys_suspend_power_state(psci_power_state_t *req_state)
+{
+	system_suspend_requested = true;
+
+	for (unsigned int level = 0U; level <= PLAT_MAX_PWR_LVL; ++level) {
+		req_state->pwr_domain_state[level] = PLAT_LOCAL_STATE_OFF;
+	}
 }
 
 /*******************************************************************************
@@ -139,6 +155,8 @@ static int qemu_pwr_domain_on(u_register_t mpidr)
  ******************************************************************************/
 static void qemu_pwr_domain_off(const psci_power_state_t *target_state)
 {
+	/* CPU_OFF is not a system suspend, even when it turns all levels off. */
+	system_suspend_requested = false;
 	qemu_pwr_gic_off();
 }
 
@@ -147,6 +165,10 @@ void __dead2 plat_secondary_cold_boot_setup(void);
 static void __dead2
 qemu_pwr_domain_pwr_down_wfi(const psci_power_state_t *target_state)
 {
+	if (system_suspend_requested) {
+		gpio_set_value(SECURE_GPIO_SUSPEND, GPIO_LEVEL_HIGH);
+	}
+
 	disable_mmu_el3();
 	plat_secondary_cold_boot_setup();
 }
@@ -157,7 +179,12 @@ qemu_pwr_domain_pwr_down_wfi(const psci_power_state_t *target_state)
  ******************************************************************************/
 void qemu_pwr_domain_suspend(const psci_power_state_t *target_state)
 {
-	assert(0);
+	qemu_pwr_gic_off();
+
+	if (system_suspend_requested) {
+		gpio_set_direction(SECURE_GPIO_SUSPEND, GPIO_DIR_OUT);
+		gpio_set_value(SECURE_GPIO_SUSPEND, GPIO_LEVEL_LOW);
+	}
 }
 
 /*******************************************************************************
@@ -180,7 +207,12 @@ void qemu_pwr_domain_on_finish(const psci_power_state_t *target_state)
  ******************************************************************************/
 void qemu_pwr_domain_suspend_finish(const psci_power_state_t *target_state)
 {
-	assert(0);
+	qemu_pwr_gic_on_finish();
+
+	if (system_suspend_requested) {
+		gpio_set_value(SECURE_GPIO_SUSPEND, GPIO_LEVEL_LOW);
+		system_suspend_requested = false;
+	}
 }
 
 /*******************************************************************************
@@ -222,6 +254,7 @@ static const plat_psci_ops_t plat_qemu_psci_pm_ops = {
 	.pwr_domain_suspend = qemu_pwr_domain_suspend,
 	.pwr_domain_on_finish = qemu_pwr_domain_on_finish,
 	.pwr_domain_suspend_finish = qemu_pwr_domain_suspend_finish,
+	.get_sys_suspend_power_state = qemu_get_sys_suspend_power_state,
 	.system_off = qemu_system_off,
 	.system_reset = qemu_system_reset,
 	.validate_power_state = qemu_validate_power_state,
